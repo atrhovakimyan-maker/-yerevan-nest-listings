@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="hy">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Yerevan Nest — Listings</title>
+<style>
+  :root{
+    --teal:#1a7a6e;
+    --teal-dark:#125c53;
+    --offwhite:#e8f7f5;
+    --ink:#16302c;
+    --ink-soft:#5c7671;
+    --line:#d7e8e4;
+    --paper:#ffffff;
+    --bg:#f5faf9;
+    --danger:#b3492f;
+    --radius:10px;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--ink);
+    font-family:'Segoe UI', Inter, system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1080px;margin:0 auto;padding:28px 20px 80px;}
+
+  header.top{
+    display:flex;justify-content:space-between;align-items:flex-end;
+    margin-bottom:22px;flex-wrap:wrap;gap:14px;
+  }
+  header.top h1{
+    margin:0;font-size:26px;letter-spacing:-0.01em;color:var(--teal-dark);
+    font-weight:700;
+  }
+  header.top .sub{color:var(--ink-soft);font-size:13px;margin-top:4px;}
+  .btn{
+    border:none;border-radius:var(--radius);padding:10px 18px;font-size:14px;font-weight:600;
+    cursor:pointer;transition:transform .08s ease, box-shadow .15s ease;
+  }
+  .btn:active{transform:scale(0.97);}
+  .btn-primary{background:var(--teal);color:white;box-shadow:0 2px 8px rgba(26,122,110,0.25);}
+  .btn-primary:hover{background:var(--teal-dark);}
+  .btn-ghost{background:transparent;color:var(--teal-dark);border:1px solid var(--line);}
+  .btn-ghost:hover{background:var(--offwhite);}
+  .btn-small{padding:6px 12px;font-size:12.5px;}
+  .btn-danger{color:var(--danger);}
+
+  /* Filter bar */
+  .filters{
+    display:flex;gap:10px;flex-wrap:wrap;align-items:center;
+    background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);
+    padding:12px 14px;margin-bottom:20px;
+  }
+  .filters input[type=text], .filters select{
+    border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:13.5px;
+    background:var(--bg);color:var(--ink);font-family:inherit;
+  }
+  .filters input[type=text]{flex:1;min-width:160px;}
+  .filters .count{margin-left:auto;font-size:12.5px;color:var(--ink-soft);white-space:nowrap;}
+
+  /* District groups */
+  .district-group{margin-bottom:26px;}
+  .district-head{
+    display:flex;align-items:baseline;gap:10px;margin-bottom:10px;
+    border-bottom:2px solid var(--offwhite);padding-bottom:6px;
+  }
+  .district-head h2{font-size:16px;margin:0;color:var(--teal-dark);font-weight:700;}
+  .district-head .n{font-size:12px;color:var(--ink-soft);}
+
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;}
+
+  .card{
+    background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);
+    padding:14px 14px 12px;position:relative;display:flex;flex-direction:column;gap:6px;
+  }
+  .card .badge{
+    display:inline-block;font-size:10.5px;font-weight:700;letter-spacing:.03em;
+    padding:2px 8px;border-radius:20px;text-transform:uppercase;width:fit-content;
+  }
+  .badge.sale{background:#fdece6;color:#a8482b;}
+  .badge.rent{background:var(--offwhite);color:var(--teal-dark);}
+  .card .price{font-size:19px;font-weight:700;color:var(--teal-dark);}
+  .card .meta{font-size:13px;color:var(--ink-soft);}
+  .card .street{font-size:12.5px;color:var(--ink-soft);}
+  .card .phone{font-size:13.5px;font-weight:600;color:var(--ink);}
+  .card .commission{font-size:12.5px;font-weight:600;color:var(--teal-dark);background:var(--offwhite);padding:2px 8px;border-radius:6px;width:fit-content;}
+  .card .available{font-size:12.5px;font-weight:600;color:#a8482b;background:#fdece6;padding:2px 8px;border-radius:6px;width:fit-content;}
+  .photo-strip{display:flex;gap:5px;margin:-2px 0 4px;}
+  .photo-strip img{
+    width:100%;height:120px;object-fit:cover;border-radius:8px;background:var(--bg);
+    flex:1;min-width:0;
+  }
+  .photo-strip.single img{height:150px;}
+  .card .notes{font-size:12.5px;color:var(--ink-soft);margin-top:2px;line-height:1.4;}
+  .card a.url-link{font-size:12px;color:var(--teal);word-break:break-all;text-decoration:none;}
+  .card a.url-link:hover{text-decoration:underline;}
+  .card-actions{
+    display:flex;gap:6px;margin-top:8px;padding-top:8px;border-top:1px dashed var(--line);
+  }
+  .card .date{position:absolute;top:10px;right:12px;font-size:10.5px;color:#a9beb9;}
+
+  .empty{
+    text-align:center;padding:60px 20px;color:var(--ink-soft);
+    background:var(--paper);border:1px dashed var(--line);border-radius:var(--radius);
+  }
+  .empty b{color:var(--teal-dark);}
+
+  /* Modal */
+  .overlay{
+    position:fixed;inset:0;background:rgba(18,40,36,0.45);
+    display:none;align-items:center;justify-content:center;padding:20px;z-index:50;
+  }
+  .overlay.show{display:flex;}
+  .modal{
+    background:var(--paper);border-radius:14px;max-width:560px;width:100%;
+    max-height:90vh;overflow-y:auto;padding:22px 24px 24px;
+  }
+  .modal h3{margin:0 0 4px;color:var(--teal-dark);font-size:18px;}
+  .modal .modal-sub{font-size:12.5px;color:var(--ink-soft);margin-bottom:16px;}
+  .field{margin-bottom:12px;}
+  .field label{display:block;font-size:12.5px;font-weight:600;color:var(--ink);margin-bottom:4px;}
+  .field input, .field select, .field textarea{
+    width:100%;border:1px solid var(--line);border-radius:8px;padding:9px 10px;
+    font-size:13.5px;font-family:inherit;background:var(--bg);color:var(--ink);
+  }
+  .field textarea{resize:vertical;min-height:56px;}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;}
+  .modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px;}
+  .toggle-group{display:flex;gap:6px;}
+  .toggle-group button{
+    flex:1;padding:8px;border-radius:8px;border:1px solid var(--line);background:var(--bg);
+    font-size:13px;cursor:pointer;font-weight:600;color:var(--ink-soft);
+  }
+  .toggle-group button.active.sale{background:#fdece6;color:#a8482b;border-color:#f0b7a2;}
+  .toggle-group button.active.rent{background:var(--offwhite);color:var(--teal-dark);border-color:var(--teal);}
+
+  .status-msg{
+    position:fixed;bottom:20px;left:50%;transform:translateX(-50%);
+    background:var(--teal-dark);color:white;padding:10px 18px;border-radius:20px;
+    font-size:13px;box-shadow:0 4px 16px rgba(0,0,0,0.2);opacity:0;pointer-events:none;
+    transition:opacity .25s ease, transform .25s ease;z-index:100;
+  }
+  .status-msg.show{opacity:1;transform:translateX(-50%) translateY(-6px);}
+
+  @media (max-width:480px){
+    .row2,.row3{grid-template-columns:1fr;}
+    header.top{flex-direction:column;align-items:stretch;}
+    .btn-primary{width:100%;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>Yerevan Nest — Listings</h1>
+      <div class="sub">Ձեր անշարժ գույքի հայտարարությունների բազա</div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <button class="btn btn-primary" id="openAddBtn">+ Ավելացնել հայտարարություն</button>
+      <button class="btn btn-ghost" id="openImportBtn">Ներմուծել (paste)</button>
+      <button class="btn btn-ghost" id="exportBtn">⬇ Backup</button>
+      <button class="btn btn-ghost" id="restoreBtn">⬆ Restore</button>
+      <input type="file" id="restoreFile" accept="application/json" style="display:none;">
+    </div>
+  </header>
+
+  <div class="filters">
+    <select id="filterDistrict"><option value="">Բոլոր թաղամասերը</option></select>
+    <select id="filterType">
+      <option value="">Վաճառք + Վարձակալություն</option>
+      <option value="sale">Միայն Վաճառք</option>
+      <option value="rent">Միայն Վարձակալություն</option>
+    </select>
+    <input type="text" id="searchBox" placeholder="Փնտրել փողոց, նշում, հեռախոսահամար...">
+    <span class="count" id="resultCount"></span>
+  </div>
+
+  <div id="listingsRoot"></div>
+</div>
+
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <h3 id="modalTitle">Նոր հայտարարություն</h3>
+    <div class="modal-sub">Լցրեք հայտնի դաշտերը։ Պարտադիր չէ ամեն ինչ գիտենալ։</div>
+
+    <div class="field">
+      <label>List.am հղում (URL)</label>
+      <input type="text" id="f_url" placeholder="https://www.list.am/item/...">
+    </div>
+
+    <div class="field">
+      <label>Նկարների հղումներ (URL, ստորակետով բաժանված)</label>
+      <textarea id="f_photos" placeholder="https://img.list.am/f/.../1.jpg, https://img.list.am/f/.../2.jpg"></textarea>
+    </div>
+
+    <div class="field">
+      <label>Գործարքի տեսակ</label>
+      <div class="toggle-group">
+        <button type="button" id="t_sale" class="sale">Վաճառք</button>
+        <button type="button" id="t_rent" class="rent">Վարձակալություն</button>
+      </div>
+    </div>
+
+    <div class="row2">
+      <div class="field">
+        <label>Թաղամաս</label>
+        <select id="f_district"></select>
+      </div>
+      <div class="field">
+        <label>Փողոց</label>
+        <input type="text" id="f_street" placeholder="օր․ Սարյան փող.">
+      </div>
+    </div>
+
+    <div class="row3">
+      <div class="field">
+        <label>Գին</label>
+        <input type="text" id="f_price" placeholder="65,000,000 կամ $170,000">
+      </div>
+      <div class="field">
+        <label>Սենյակ</label>
+        <input type="number" id="f_rooms" min="0" placeholder="3">
+      </div>
+      <div class="field">
+        <label>Մակերես (քմ)</label>
+        <input type="number" id="f_area" min="0" placeholder="75">
+      </div>
+    </div>
+
+    <div class="row2">
+      <div class="field">
+        <label>Հարկ / Ընդհանուր հարկեր</label>
+        <input type="text" id="f_floor" placeholder="4/9">
+      </div>
+      <div class="field">
+        <label>Հեռախոսահամար</label>
+        <input type="text" id="f_phone" placeholder="+374...">
+      </div>
+    </div>
+
+    <div class="row2">
+      <div class="field">
+        <label>Սեփականատեր / Կոնտակտ անուն</label>
+        <input type="text" id="f_owner" placeholder="անուն (ոչ պարտադիր)">
+      </div>
+      <div class="field">
+        <label>Կոմիսիոն</label>
+        <input type="text" id="f_commission" placeholder="օր․ 50% վարձից, կամ 2%">
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Հասանելի է սկսած</label>
+      <input type="text" id="f_available" placeholder="օր․ Հոկտեմբերի 1, կամ Հիմա">
+    </div>
+
+    <div class="field">
+      <label>Նշումներ</label>
+      <textarea id="f_notes" placeholder="ցանկացած լրացուցիչ տեղեկություն"></textarea>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="cancelBtn">Չեղարկել</button>
+      <button class="btn btn-primary" id="saveBtn">Պահպանել</button>
+    </div>
+  </div>
+</div>
+
+<div class="status-msg" id="statusMsg"></div>
+
+<div class="overlay" id="importOverlay">
+  <div class="modal">
+    <h3>Ներմուծել հայտարարություն</h3>
+    <div class="modal-sub">Տեղադրիր Claude-ի տված կոդը այստեղ և սեղմիր «Ներմուծել»։</div>
+    <div class="field">
+      <textarea id="importText" style="min-height:180px;font-family:monospace;font-size:12px;" placeholder='{"dealType":"rent","district":"Կենտրոն", ...}'></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="importCancelBtn">Չեղարկել</button>
+      <button class="btn btn-primary" id="importSaveBtn">Ներմուծել</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const DISTRICTS = [
+  "Կենտրոն","Արաբկիր","Աջափնյակ","Ավան","Դավթաշեն","Էրեբունի",
+  "Քանաքեռ-Զեյթուն","Մալաթիա-Սեբաստիա","Նոր Նորք","Նորք-Մարաշ","Նուբարաշեն","Շենգավիթ","Այլ"
+];
+
+let listings = [];
+let editingId = null;
+let dealType = 'sale';
+
+const $ = (id) => document.getElementById(id);
+
+function showStatus(msg){
+  const el = $('statusMsg');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(()=>el.classList.remove('show'), 1800);
+}
+
+function populateDistrictSelects(){
+  const filterSel = $('filterDistrict');
+  const formSel = $('f_district');
+  DISTRICTS.forEach(d=>{
+    const o1 = document.createElement('option'); o1.value = d; o1.textContent = d;
+    filterSel.appendChild(o1);
+    const o2 = document.createElement('option'); o2.value = d; o2.textContent = d;
+    formSel.appendChild(o2);
+  });
+}
+
+const STORAGE_KEY = 'yerevanNestListings';
+
+async function loadListings(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    listings = raw ? JSON.parse(raw) : [];
+  }catch(e){
+    listings = [];
+  }
+  render();
+}
+
+async function persist(){
+  try{
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(listings));
+  }catch(e){
+    showStatus('Պահպանման սխալ։ Փորձեք կրկին։');
+  }
+}
+
+function fmtDate(iso){
+  const d = new Date(iso);
+  return d.toLocaleDateString('hy-AM', {day:'2-digit', month:'2-digit', year:'2-digit'});
+}
+
+function render(){
+  const root = $('listingsRoot');
+  const districtFilter = $('filterDistrict').value;
+  const typeFilter = $('filterType').value;
+  const q = $('searchBox').value.trim().toLowerCase();
+
+  let filtered = listings.filter(l=>{
+    if(districtFilter && l.district !== districtFilter) return false;
+    if(typeFilter && l.dealType !== typeFilter) return false;
+    if(q){
+      const hay = [l.street,l.notes,l.phone,l.owner,l.url,l.commission].join(' ').toLowerCase();
+      if(!hay.includes(q)) return false;
+    }
+    return true;
+  });
+
+  $('resultCount').textContent = filtered.length + ' հայտարարություն';
+
+  if(filtered.length === 0){
+    root.innerHTML = `<div class="empty"><b>Դատարկ է</b><br>Ավելացրեք առաջին հայտարարությունը «+ Ավելացնել» կոճակով։</div>`;
+    return;
+  }
+
+  // group by district, preserving DISTRICTS order
+  const groups = {};
+  filtered.forEach(l=>{
+    const d = l.district || 'Այլ';
+    if(!groups[d]) groups[d] = [];
+    groups[d].push(l);
+  });
+
+  const orderedDistricts = DISTRICTS.filter(d=>groups[d]).concat(Object.keys(groups).filter(d=>!DISTRICTS.includes(d)));
+
+  root.innerHTML = orderedDistricts.map(district=>{
+    const items = groups[district].sort((a,b)=> new Date(b.dateAdded) - new Date(a.dateAdded));
+    return `
+      <div class="district-group">
+        <div class="district-head">
+          <h2>${escapeHtml(district)}</h2>
+          <span class="n">${items.length}</span>
+        </div>
+        <div class="grid">
+          ${items.map(cardHtml).join('')}
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  // attach handlers
+  filtered.forEach(l=>{
+    const editBtn = document.getElementById('edit-'+l.id);
+    const delBtn = document.getElementById('del-'+l.id);
+    if(editBtn) editBtn.onclick = ()=>openEdit(l.id);
+    if(delBtn) delBtn.onclick = ()=>deleteListing(l.id);
+  });
+}
+
+function escapeHtml(s){
+  if(!s) return '';
+  return s.replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function cardHtml(l){
+  const badgeClass = l.dealType === 'rent' ? 'rent' : 'sale';
+  const badgeLabel = l.dealType === 'rent' ? 'Վարձակալություն' : 'Վաճառք';
+  const photos = (l.photos || []).slice(0,3);
+  const photoHtml = photos.length ? `
+    <div class="photo-strip ${photos.length===1?'single':''}">
+      ${photos.map(p=>`<img src="${escapeHtml(p)}" loading="lazy" onerror="this.style.display='none'">`).join('')}
+    </div>` : '';
+  return `
+    <div class="card">
+      <span class="date">${fmtDate(l.dateAdded)}</span>
+      ${photoHtml}
+      <span class="badge ${badgeClass}">${badgeLabel}</span>
+      ${l.price ? `<div class="price">${escapeHtml(l.price)}</div>` : ''}
+      <div class="meta">${[l.rooms ? l.rooms+' սեն.' : '', l.area ? l.area+' քմ' : '', l.floor ? l.floor+' հարկ' : ''].filter(Boolean).join(' · ')}</div>
+      ${l.street ? `<div class="street">${escapeHtml(l.street)}</div>` : ''}
+      ${l.phone ? `<div class="phone">📞 ${escapeHtml(l.phone)}</div>` : ''}
+      ${l.owner ? `<div class="street">${escapeHtml(l.owner)}</div>` : ''}
+      ${l.commission ? `<div class="commission">Կոմիսիոն՝ ${escapeHtml(l.commission)}</div>` : ''}
+      ${l.available ? `<div class="available">Հասանելի է՝ ${escapeHtml(l.available)}</div>` : ''}
+      ${l.notes ? `<div class="notes">${escapeHtml(l.notes)}</div>` : ''}
+      ${l.url ? `<a class="url-link" href="${escapeHtml(l.url)}" target="_blank" rel="noopener">${escapeHtml(l.url)}</a>` : ''}
+      <div class="card-actions">
+        <button class="btn btn-ghost btn-small" id="edit-${l.id}">Խմբագրել</button>
+        <button class="btn btn-ghost btn-small btn-danger" id="del-${l.id}">Ջնջել</button>
+      </div>
+    </div>
+  `;
+}
+
+function openAdd(){
+  editingId = null;
+  dealType = 'sale';
+  $('modalTitle').textContent = 'Նոր հայտարարություն';
+  ['f_url','f_street','f_price','f_rooms','f_area','f_floor','f_phone','f_owner','f_commission','f_available','f_notes','f_photos'].forEach(id=>$(id).value='');
+  $('f_district').value = DISTRICTS[0];
+  updateToggle();
+  $('overlay').classList.add('show');
+  $('f_url').focus();
+}
+
+function openEdit(id){
+  const l = listings.find(x=>x.id===id);
+  if(!l) return;
+  editingId = id;
+  dealType = l.dealType || 'sale';
+  $('modalTitle').textContent = 'Խմբագրել հայտարարությունը';
+  $('f_url').value = l.url||'';
+  $('f_district').value = l.district || DISTRICTS[0];
+  $('f_street').value = l.street||'';
+  $('f_price').value = l.price||'';
+  $('f_rooms').value = l.rooms||'';
+  $('f_area').value = l.area||'';
+  $('f_floor').value = l.floor||'';
+  $('f_phone').value = l.phone||'';
+  $('f_owner').value = l.owner||'';
+  $('f_commission').value = l.commission||'';
+  $('f_available').value = l.available||'';
+  $('f_photos').value = (l.photos||[]).join(', ');
+  $('f_notes').value = l.notes||'';
+  updateToggle();
+  $('overlay').classList.add('show');
+}
+
+function updateToggle(){
+  $('t_sale').classList.toggle('active', dealType==='sale');
+  $('t_rent').classList.toggle('active', dealType==='rent');
+}
+
+function closeModal(){
+  $('overlay').classList.remove('show');
+}
+
+async function saveListing(){
+  const data = {
+    url: $('f_url').value.trim(),
+    dealType,
+    district: $('f_district').value,
+    street: $('f_street').value.trim(),
+    price: $('f_price').value.trim(),
+    rooms: $('f_rooms').value.trim(),
+    area: $('f_area').value.trim(),
+    floor: $('f_floor').value.trim(),
+    phone: $('f_phone').value.trim(),
+    owner: $('f_owner').value.trim(),
+    commission: $('f_commission').value.trim(),
+    available: $('f_available').value.trim(),
+    photos: $('f_photos').value.split(',').map(s=>s.trim()).filter(Boolean),
+    notes: $('f_notes').value.trim(),
+  };
+
+  if(!data.street && !data.url && !data.price){
+    showStatus('Լրացրեք գոնե հասցե, գին կամ հղում');
+    return;
+  }
+
+  if(editingId){
+    const idx = listings.findIndex(x=>x.id===editingId);
+    if(idx>-1) listings[idx] = {...listings[idx], ...data};
+    showStatus('Թարմացվեց ✓');
+  }else{
+    listings.push({id: 'l_'+Date.now()+'_'+Math.random().toString(36).slice(2,7), dateAdded: new Date().toISOString(), ...data});
+    showStatus('Ավելացվեց ✓');
+  }
+  await persist();
+  closeModal();
+  render();
+}
+
+async function deleteListing(id){
+  listings = listings.filter(x=>x.id!==id);
+  await persist();
+  render();
+  showStatus('Ջնջվեց');
+}
+
+// Wire up events
+populateDistrictSelects();
+$('openAddBtn').onclick = openAdd;
+$('cancelBtn').onclick = closeModal;
+$('saveBtn').onclick = saveListing;
+$('overlay').onclick = (e)=>{ if(e.target.id==='overlay') closeModal(); };
+$('t_sale').onclick = ()=>{ dealType='sale'; updateToggle(); };
+$('t_rent').onclick = ()=>{ dealType='rent'; updateToggle(); };
+$('filterDistrict').onchange = render;
+$('filterType').onchange = render;
+$('searchBox').oninput = render;
+
+$('openImportBtn').onclick = ()=>{ $('importText').value=''; $('importOverlay').classList.add('show'); };
+$('importCancelBtn').onclick = ()=> $('importOverlay').classList.remove('show');
+$('importOverlay').onclick = (e)=>{ if(e.target.id==='importOverlay') $('importOverlay').classList.remove('show'); };
+$('importSaveBtn').onclick = async ()=>{
+  let raw = $('importText').value.trim();
+  if(!raw){ showStatus('Դատարկ է'); return; }
+  let parsed;
+  try{
+    parsed = JSON.parse(raw);
+  }catch(e){
+    showStatus('Սխալ JSON ձևաչափ');
+    return;
+  }
+  const items = Array.isArray(parsed) ? parsed : [parsed];
+  let count = 0;
+  items.forEach(item=>{
+    listings.push({
+      id: 'l_'+Date.now()+'_'+Math.random().toString(36).slice(2,7),
+      dateAdded: new Date().toISOString(),
+      dealType: item.dealType || 'sale',
+      district: item.district || 'Այլ',
+      street: item.street || '',
+      price: item.price || '',
+      rooms: item.rooms || '',
+      area: item.area || '',
+      floor: item.floor || '',
+      phone: item.phone || '',
+      owner: item.owner || '',
+      commission: item.commission || '',
+      available: item.available || '',
+      photos: Array.isArray(item.photos) ? item.photos : (item.photos ? [item.photos] : []),
+      notes: item.notes || '',
+      url: item.url || '',
+    });
+    count++;
+  });
+  await persist();
+  $('importOverlay').classList.remove('show');
+  render();
+  showStatus(count + ' հայտարարություն ներմուծվեց ✓');
+};
+
+$('exportBtn').onclick = ()=>{
+  const blob = new Blob([JSON.stringify(listings, null, 2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'yerevan-nest-backup-' + new Date().toISOString().slice(0,10) + '.json';
+  a.click();
+  showStatus('Backup ներբեռնվեց');
+};
+$('restoreBtn').onclick = ()=> $('restoreFile').click();
+$('restoreFile').onchange = async (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  try{
+    const text = await file.text();
+    const parsed = JSON.parse(text);
+    if(!Array.isArray(parsed)) throw new Error('bad format');
+    listings = parsed;
+    await persist();
+    render();
+    showStatus(listings.length + ' հայտարարություն վերականգնվեց ✓');
+  }catch(err){
+    showStatus('Backup ֆայլը սխալ ձևաչափով է');
+  }
+  e.target.value = '';
+};
+
+loadListings();
+</script>
+</body>
+</html>
