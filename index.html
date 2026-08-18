@@ -351,6 +351,10 @@ const DISTRICTS = [
   "Քանաքեռ-Զեյթուն","Մալաթիա-Սեբաստիա","Նոր Նորք","Նորք-Մարաշ","Նուբարաշեն","Շենգավիթ","Այլ"
 ];
 
+// Public read-only Gist ID — anyone opening this page can VIEW listings from here,
+// without needing a token. Only editing/pushing requires a personal token via Sync.
+const PUBLIC_GIST_ID = 'f064dac278f2fb1821b0ea7ee20347d3';
+
 let listings = [];
 let editingId = null;
 let dealType = 'sale';
@@ -457,6 +461,15 @@ function render(){
   });
 }
 
+function isEditor(){ return !!getSyncToken(); }
+
+function applyEditorMode(){
+  const editor = isEditor();
+  $('openAddBtn').style.display = editor ? '' : 'none';
+  $('openImportBtn').style.display = editor ? '' : 'none';
+  $('restoreBtn').style.display = editor ? '' : 'none';
+}
+
 function phoneForTel(phone){
   return (phone||'').replace(/[^\d+]/g,'');
 }
@@ -499,10 +512,11 @@ function cardHtml(l){
       ${l.available ? `<div class="available">Հասանելի է՝ ${escapeHtml(l.available)}</div>` : ''}
       ${l.notes ? `<div class="notes">${escapeHtml(l.notes)}</div>` : ''}
       ${l.url ? `<a class="url-link" href="${escapeHtml(l.url)}" target="_blank" rel="noopener">${escapeHtml(l.url)}</a>` : ''}
+      ${isEditor() ? `
       <div class="card-actions">
         <button class="btn btn-ghost btn-small" id="edit-${l.id}">Խմբագրել</button>
         <button class="btn btn-ghost btn-small btn-danger" id="del-${l.id}">Ջնջել</button>
-      </div>
+      </div>` : ''}
     </div>
   `;
 }
@@ -552,11 +566,15 @@ function openDetail(id){
       </div>` : ''}
     ${l.notes ? `<div class="detail-notes">${escapeHtml(l.notes)}</div>` : ''}
     ${l.url ? `<a class="url-link" href="${escapeHtml(l.url)}" target="_blank" rel="noopener">${escapeHtml(l.url)}</a>` : ''}
+    ${isEditor() ? `
     <div class="modal-actions">
       <button class="btn btn-ghost btn-small btn-danger" onclick="closeDetail(); deleteListing('${l.id}');">Ջնջել</button>
       <button class="btn btn-ghost btn-small" onclick="closeDetail(); openEdit('${l.id}');">Խմբագրել</button>
       <button class="btn btn-ghost" onclick="closeDetail()">Փակել</button>
-    </div>
+    </div>` : `
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeDetail()">Փակել</button>
+    </div>`}
   `;
   $('detailOverlay').classList.add('show');
 }
@@ -852,15 +870,35 @@ async function syncPull(){
   }
 }
 
-// Auto-pull on load if already synced
+async function fetchPublicGist(){
+  if(!PUBLIC_GIST_ID) return false;
+  try{
+    const res = await fetch('https://api.github.com/gists/'+PUBLIC_GIST_ID);
+    if(!res.ok) throw new Error('not found');
+    const data = await res.json();
+    const content = data.files && data.files[GIST_FILENAME] ? data.files[GIST_FILENAME].content : '[]';
+    const parsed = JSON.parse(content);
+    listings = Array.isArray(parsed) ? parsed : [];
+    render();
+    return true;
+  }catch(e){
+    return false;
+  }
+}
+
+// Auto-pull on load: if this device has its own token+id, use that (editable).
+// Otherwise, fall back to the public read-only Gist so any visitor sees current listings.
 async function autoSyncOnLoad(){
   if(getSyncId() && getSyncToken()){
     await syncPull();
+  }else{
+    await fetchPublicGist();
   }
 }
 
 loadListings();
 autoSyncOnLoad();
+applyEditorMode();
 </script>
 </body>
 </html>
