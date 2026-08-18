@@ -298,18 +298,23 @@
 <div class="overlay" id="syncOverlay">
   <div class="modal">
     <h3>🔄 Սարքերի սինքրոնացում</h3>
-    <div class="modal-sub">Mac-ից և iPhone-ից նույն տվյալները տեսնելու համար կիսվեք միևնույն Sync կոդով։</div>
+    <div class="modal-sub">GitHub Gist-ի միջոցով։ Mac-ից և iPhone-ից նույն token+Gist ID մուտքագրելով՝ տվյալները կկիսվեն։</div>
 
     <div id="syncStatus" style="font-size:12.5px;color:var(--ink-soft);margin-bottom:14px;"></div>
 
     <div class="field">
-      <label>Sync կոդ</label>
-      <input type="text" id="syncCode" placeholder="տեղադրիր կոդը այստեղ մյուս սարքից">
+      <label>GitHub Token (միայն այս սարքում է պահվում)</label>
+      <input type="password" id="syncToken" placeholder="ghp_...">
+    </div>
+
+    <div class="field">
+      <label>Gist ID</label>
+      <input type="text" id="syncCode" placeholder="տեղադրիր Gist ID-ն մյուս սարքից, կամ ստեղծիր նոր">
     </div>
 
     <div class="modal-actions" style="justify-content:flex-start;flex-wrap:wrap;">
       <button class="btn btn-primary btn-small" id="syncCreateBtn">Ստեղծել նոր Sync (այս սարքից)</button>
-      <button class="btn btn-ghost btn-small" id="syncConnectBtn">Միանալ այս կոդով</button>
+      <button class="btn btn-ghost btn-small" id="syncConnectBtn">Միանալ այս Gist ID-ով</button>
       <button class="btn btn-ghost btn-small" id="syncPushBtn">Ուղարկել հիմա</button>
       <button class="btn btn-ghost btn-small" id="syncPullBtn">Ստանալ հիմա</button>
     </div>
@@ -652,17 +657,24 @@ $('restoreFile').onchange = async (e)=>{
   e.target.value = '';
 };
 
-// --- Sync (cross-device, via jsonblob.com — free, no signup) ---
+// --- Sync (cross-device, via GitHub Gist — uses your own GitHub account) ---
 const SYNC_ID_KEY = 'yerevanNestSyncId';
+const SYNC_TOKEN_KEY = 'yerevanNestSyncToken';
+const GIST_FILENAME = 'yerevan-nest-listings.json';
+
 function getSyncId(){ return localStorage.getItem(SYNC_ID_KEY) || ''; }
 function setSyncId(id){ localStorage.setItem(SYNC_ID_KEY, id); }
+function getSyncToken(){ return localStorage.getItem(SYNC_TOKEN_KEY) || ''; }
+function setSyncToken(t){ localStorage.setItem(SYNC_TOKEN_KEY, t); }
 
 function setSyncStatus(msg){ $('syncStatus').textContent = msg; }
 
 function refreshSyncModal(){
   const id = getSyncId();
+  const token = getSyncToken();
   $('syncCode').value = id;
-  setSyncStatus(id ? ('Կապակցված է Sync կոդի հետ. ' + id) : 'Դեռ սինքրոնացված չէ այս սարքում։');
+  $('syncToken').value = token;
+  setSyncStatus(id ? ('Կապակցված է Gist ID-ի հետ. ' + id) : 'Դեռ սինքրոնացված չէ այս սարքում։');
 }
 
 $('openSyncBtn').onclick = ()=>{ refreshSyncModal(); $('syncOverlay').classList.add('show'); };
@@ -670,27 +682,39 @@ $('syncCloseBtn').onclick = ()=> $('syncOverlay').classList.remove('show');
 $('syncOverlay').onclick = (e)=>{ if(e.target.id==='syncOverlay') $('syncOverlay').classList.remove('show'); };
 
 $('syncCreateBtn').onclick = async ()=>{
+  const token = $('syncToken').value.trim();
+  if(!token){ setSyncStatus('Նախ մուտքագրիր GitHub Token-ը'); return; }
+  setSyncToken(token);
   setSyncStatus('Ստեղծվում է...');
   try{
-    const res = await fetch('https://jsonblob.com/api/jsonBlob', {
+    const res = await fetch('https://api.github.com/gists', {
       method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify(listings)
+      headers:{
+        'Authorization':'token '+token,
+        'Accept':'application/vnd.github+json',
+        'Content-Type':'application/json'
+      },
+      body: JSON.stringify({
+        description: 'Yerevan Nest Listings Sync',
+        public: false,
+        files: { [GIST_FILENAME]: { content: JSON.stringify(listings, null, 2) } }
+      })
     });
-    const loc = res.headers.get('Location') || res.headers.get('location');
-    const id = loc ? loc.split('/').pop() : null;
-    if(!id) throw new Error('no id');
-    setSyncId(id);
+    if(!res.ok) throw new Error('bad response '+res.status);
+    const data = await res.json();
+    setSyncId(data.id);
     refreshSyncModal();
-    showStatus('Sync ստեղծվեց ✓ Կոդը պատճենիր և մուտքագրիր մյուս սարքում');
+    showStatus('Sync ստեղծվեց ✓ Token-ը և Gist ID-ն մուտքագրիր մյուս սարքում');
   }catch(e){
-    setSyncStatus('Չհաջողվեց ստեղծել Sync։ Ստուգիր ինտերնետ կապը։');
+    setSyncStatus('Չհաջողվեց ստեղծել։ Ստուգիր token-ը ճիշտ է, և ունի gist իրավունք։');
   }
 };
 
 $('syncConnectBtn').onclick = async ()=>{
+  const token = $('syncToken').value.trim();
   const id = $('syncCode').value.trim();
-  if(!id){ setSyncStatus('Գրիր Sync կոդը'); return; }
+  if(!token || !id){ setSyncStatus('Գրիր և՛ Token-ը, և՛ Gist ID-ն'); return; }
+  setSyncToken(token);
   setSyncId(id);
   await syncPull();
 };
@@ -700,42 +724,58 @@ $('syncPullBtn').onclick = syncPull;
 
 async function syncPush(){
   const id = getSyncId();
-  if(!id){ setSyncStatus('Նախ ստեղծիր կամ միացիր Sync կոդի'); return; }
+  const token = getSyncToken();
+  if(!id || !token){ setSyncStatus('Նախ ստեղծիր կամ միացիր Sync-ի'); return; }
   setSyncStatus('Ուղարկվում է...');
   try{
-    await fetch('https://jsonblob.com/api/jsonBlob/'+id, {
-      method:'PUT',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify(listings)
+    const res = await fetch('https://api.github.com/gists/'+id, {
+      method:'PATCH',
+      headers:{
+        'Authorization':'token '+token,
+        'Accept':'application/vnd.github+json',
+        'Content-Type':'application/json'
+      },
+      body: JSON.stringify({
+        files: { [GIST_FILENAME]: { content: JSON.stringify(listings, null, 2) } }
+      })
     });
+    if(!res.ok) throw new Error('bad response '+res.status);
     setSyncStatus('Ուղարկվեց ✓ (' + listings.length + ' հայտարարություն)');
     showStatus('Sync ուղարկվեց ✓');
   }catch(e){
-    setSyncStatus('Սխալ ուղարկելիս։ Ստուգիր ինտերնետը։');
+    setSyncStatus('Սխալ ուղարկելիս։ Ստուգիր token-ը և ինտերնետը։');
   }
 }
 
 async function syncPull(){
   const id = getSyncId();
-  if(!id){ setSyncStatus('Նախ մուտքագրիր Sync կոդը'); return; }
+  const token = getSyncToken();
+  if(!id || !token){ setSyncStatus('Նախ մուտքագրիր Token-ը և Gist ID-ն'); return; }
   setSyncStatus('Ստացվում է...');
   try{
-    const res = await fetch('https://jsonblob.com/api/jsonBlob/'+id);
+    const res = await fetch('https://api.github.com/gists/'+id, {
+      headers:{
+        'Authorization':'token '+token,
+        'Accept':'application/vnd.github+json'
+      }
+    });
     if(!res.ok) throw new Error('not found');
     const data = await res.json();
-    listings = Array.isArray(data) ? data : [];
+    const content = data.files && data.files[GIST_FILENAME] ? data.files[GIST_FILENAME].content : '[]';
+    const parsed = JSON.parse(content);
+    listings = Array.isArray(parsed) ? parsed : [];
     await persist();
     render();
     setSyncStatus('Ստացվեց ✓ (' + listings.length + ' հայտարարություն)');
     showStatus('Sync-ից թարմացվեց ✓');
   }catch(e){
-    setSyncStatus('Կոդը չգտնվեց, կամ ինտերնետի խնդիր է։');
+    setSyncStatus('Gist ID-ն չգտնվեց, կամ token-ի/ինտերնետի խնդիր է։');
   }
 }
 
-// Auto-pull on load if a sync id is already set, then keep local+remote in sync on every save
+// Auto-pull on load if already synced
 async function autoSyncOnLoad(){
-  if(getSyncId()){
+  if(getSyncId() && getSyncToken()){
     await syncPull();
   }
 }
