@@ -100,6 +100,13 @@
   .card-actions{
     display:flex;gap:6px;margin-top:8px;padding-top:8px;border-top:1px dashed var(--line);
   }
+  .contact-actions{display:flex;gap:6px;}
+  .contact-btn{
+    flex:1;text-align:center;padding:7px 8px;border-radius:8px;font-size:12.5px;font-weight:700;
+    text-decoration:none;display:flex;align-items:center;justify-content:center;gap:4px;
+  }
+  .contact-btn.call{background:var(--offwhite);color:var(--teal-dark);}
+  .contact-btn.wa{background:#e4f7ec;color:#1f8a4c;}
   .card .date{position:absolute;top:10px;right:12px;font-size:10.5px;color:#a9beb9;}
 
   .empty{
@@ -165,6 +172,7 @@
       <button class="btn btn-ghost" id="openImportBtn">Ներմուծել (paste)</button>
       <button class="btn btn-ghost" id="exportBtn">⬇ Backup</button>
       <button class="btn btn-ghost" id="restoreBtn">⬆ Restore</button>
+      <button class="btn btn-ghost" id="openSyncBtn">🔄 Sync</button>
       <input type="file" id="restoreFile" accept="application/json" style="display:none;">
     </div>
   </header>
@@ -287,6 +295,31 @@
   </div>
 </div>
 
+<div class="overlay" id="syncOverlay">
+  <div class="modal">
+    <h3>🔄 Սարքերի սինքրոնացում</h3>
+    <div class="modal-sub">Mac-ից և iPhone-ից նույն տվյալները տեսնելու համար կիսվեք միևնույն Sync կոդով։</div>
+
+    <div id="syncStatus" style="font-size:12.5px;color:var(--ink-soft);margin-bottom:14px;"></div>
+
+    <div class="field">
+      <label>Sync կոդ</label>
+      <input type="text" id="syncCode" placeholder="տեղադրիր կոդը այստեղ մյուս սարքից">
+    </div>
+
+    <div class="modal-actions" style="justify-content:flex-start;flex-wrap:wrap;">
+      <button class="btn btn-primary btn-small" id="syncCreateBtn">Ստեղծել նոր Sync (այս սարքից)</button>
+      <button class="btn btn-ghost btn-small" id="syncConnectBtn">Միանալ այս կոդով</button>
+      <button class="btn btn-ghost btn-small" id="syncPushBtn">Ուղարկել հիմա</button>
+      <button class="btn btn-ghost btn-small" id="syncPullBtn">Ստանալ հիմա</button>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="syncCloseBtn">Փակել</button>
+    </div>
+  </div>
+</div>
+
 <script>
 const DISTRICTS = [
   "Կենտրոն","Արաբկիր","Աջափնյակ","Ավան","Դավթաշեն","Էրեբունի",
@@ -399,6 +432,16 @@ function render(){
   });
 }
 
+function phoneForTel(phone){
+  return (phone||'').replace(/[^\d+]/g,'');
+}
+function phoneForWa(phone){
+  let cleaned = (phone||'').replace(/[^\d+]/g,'');
+  if(cleaned.startsWith('+')) return cleaned.slice(1);
+  if(cleaned.startsWith('0')) return '374' + cleaned.slice(1);
+  return cleaned;
+}
+
 function escapeHtml(s){
   if(!s) return '';
   return s.replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -421,6 +464,11 @@ function cardHtml(l){
       <div class="meta">${[l.rooms ? l.rooms+' սեն.' : '', l.area ? l.area+' քմ' : '', l.floor ? l.floor+' հարկ' : ''].filter(Boolean).join(' · ')}</div>
       ${l.street ? `<div class="street">${escapeHtml(l.street)}</div>` : ''}
       ${l.phone ? `<div class="phone">📞 ${escapeHtml(l.phone)}</div>` : ''}
+      ${l.phone ? `
+        <div class="contact-actions">
+          <a class="contact-btn call" href="tel:${phoneForTel(l.phone)}">📞 Զանգել</a>
+          <a class="contact-btn wa" href="https://wa.me/${phoneForWa(l.phone)}" target="_blank" rel="noopener">💬 WhatsApp</a>
+        </div>` : ''}
       ${l.owner ? `<div class="street">${escapeHtml(l.owner)}</div>` : ''}
       ${l.commission ? `<div class="commission">Կոմիսիոն՝ ${escapeHtml(l.commission)}</div>` : ''}
       ${l.available ? `<div class="available">Հասանելի է՝ ${escapeHtml(l.available)}</div>` : ''}
@@ -511,6 +559,7 @@ async function saveListing(){
   await persist();
   closeModal();
   render();
+  if(getSyncId()) syncPush();
 }
 
 async function deleteListing(id){
@@ -518,6 +567,7 @@ async function deleteListing(id){
   await persist();
   render();
   showStatus('Ջնջվեց');
+  if(getSyncId()) syncPush();
 }
 
 // Wire up events
@@ -572,6 +622,7 @@ $('importSaveBtn').onclick = async ()=>{
   $('importOverlay').classList.remove('show');
   render();
   showStatus(count + ' հայտարարություն ներմուծվեց ✓');
+  if(getSyncId()) syncPush();
 };
 
 $('exportBtn').onclick = ()=>{
@@ -594,13 +645,103 @@ $('restoreFile').onchange = async (e)=>{
     await persist();
     render();
     showStatus(listings.length + ' հայտարարություն վերականգնվեց ✓');
+    if(getSyncId()) syncPush();
   }catch(err){
     showStatus('Backup ֆայլը սխալ ձևաչափով է');
   }
   e.target.value = '';
 };
 
+// --- Sync (cross-device, via jsonblob.com — free, no signup) ---
+const SYNC_ID_KEY = 'yerevanNestSyncId';
+function getSyncId(){ return localStorage.getItem(SYNC_ID_KEY) || ''; }
+function setSyncId(id){ localStorage.setItem(SYNC_ID_KEY, id); }
+
+function setSyncStatus(msg){ $('syncStatus').textContent = msg; }
+
+function refreshSyncModal(){
+  const id = getSyncId();
+  $('syncCode').value = id;
+  setSyncStatus(id ? ('Կապակցված է Sync կոդի հետ. ' + id) : 'Դեռ սինքրոնացված չէ այս սարքում։');
+}
+
+$('openSyncBtn').onclick = ()=>{ refreshSyncModal(); $('syncOverlay').classList.add('show'); };
+$('syncCloseBtn').onclick = ()=> $('syncOverlay').classList.remove('show');
+$('syncOverlay').onclick = (e)=>{ if(e.target.id==='syncOverlay') $('syncOverlay').classList.remove('show'); };
+
+$('syncCreateBtn').onclick = async ()=>{
+  setSyncStatus('Ստեղծվում է...');
+  try{
+    const res = await fetch('https://jsonblob.com/api/jsonBlob', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(listings)
+    });
+    const loc = res.headers.get('Location') || res.headers.get('location');
+    const id = loc ? loc.split('/').pop() : null;
+    if(!id) throw new Error('no id');
+    setSyncId(id);
+    refreshSyncModal();
+    showStatus('Sync ստեղծվեց ✓ Կոդը պատճենիր և մուտքագրիր մյուս սարքում');
+  }catch(e){
+    setSyncStatus('Չհաջողվեց ստեղծել Sync։ Ստուգիր ինտերնետ կապը։');
+  }
+};
+
+$('syncConnectBtn').onclick = async ()=>{
+  const id = $('syncCode').value.trim();
+  if(!id){ setSyncStatus('Գրիր Sync կոդը'); return; }
+  setSyncId(id);
+  await syncPull();
+};
+
+$('syncPushBtn').onclick = syncPush;
+$('syncPullBtn').onclick = syncPull;
+
+async function syncPush(){
+  const id = getSyncId();
+  if(!id){ setSyncStatus('Նախ ստեղծիր կամ միացիր Sync կոդի'); return; }
+  setSyncStatus('Ուղարկվում է...');
+  try{
+    await fetch('https://jsonblob.com/api/jsonBlob/'+id, {
+      method:'PUT',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(listings)
+    });
+    setSyncStatus('Ուղարկվեց ✓ (' + listings.length + ' հայտարարություն)');
+    showStatus('Sync ուղարկվեց ✓');
+  }catch(e){
+    setSyncStatus('Սխալ ուղարկելիս։ Ստուգիր ինտերնետը։');
+  }
+}
+
+async function syncPull(){
+  const id = getSyncId();
+  if(!id){ setSyncStatus('Նախ մուտքագրիր Sync կոդը'); return; }
+  setSyncStatus('Ստացվում է...');
+  try{
+    const res = await fetch('https://jsonblob.com/api/jsonBlob/'+id);
+    if(!res.ok) throw new Error('not found');
+    const data = await res.json();
+    listings = Array.isArray(data) ? data : [];
+    await persist();
+    render();
+    setSyncStatus('Ստացվեց ✓ (' + listings.length + ' հայտարարություն)');
+    showStatus('Sync-ից թարմացվեց ✓');
+  }catch(e){
+    setSyncStatus('Կոդը չգտնվեց, կամ ինտերնետի խնդիր է։');
+  }
+}
+
+// Auto-pull on load if a sync id is already set, then keep local+remote in sync on every save
+async function autoSyncOnLoad(){
+  if(getSyncId()){
+    await syncPull();
+  }
+}
+
 loadListings();
+autoSyncOnLoad();
 </script>
 </body>
 </html>
