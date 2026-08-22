@@ -123,11 +123,6 @@
   .detail-row .k{font-size:11px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.03em;}
   .detail-row .v{font-size:14px;font-weight:600;color:var(--ink);margin-top:2px;}
   .detail-notes{font-size:13.5px;color:var(--ink);line-height:1.5;background:var(--bg);border-radius:8px;padding:10px 12px;margin-bottom:14px;}
-
-  .ai-msg{max-width:88%;padding:9px 12px;border-radius:12px;font-size:13.5px;line-height:1.5;white-space:pre-wrap;word-break:break-word;}
-  .ai-msg.user{align-self:flex-end;background:var(--teal);color:white;border-bottom-right-radius:3px;}
-  .ai-msg.assistant{align-self:flex-start;background:var(--offwhite);color:var(--ink);border-bottom-left-radius:3px;}
-  .ai-msg a{color:inherit;text-decoration:underline;}
   .card .date{position:absolute;top:10px;right:12px;font-size:10.5px;color:#a9beb9;}
 
   .empty{
@@ -194,7 +189,6 @@
       <button class="btn btn-ghost" id="exportBtn">⬇ Backup</button>
       <button class="btn btn-ghost" id="restoreBtn">⬆ Restore</button>
       <button class="btn btn-ghost" id="openSyncBtn">🔄 Sync</button>
-      <button class="btn btn-ghost" id="openAiBtn">🤖 AI Օգնական</button>
       <input type="file" id="restoreFile" accept="application/json" style="display:none;">
     </div>
   </header>
@@ -349,22 +343,6 @@
 
 <div class="overlay" id="detailOverlay">
   <div class="modal" id="detailModal" style="max-width:640px;"></div>
-</div>
-
-<div class="overlay" id="aiOverlay">
-  <div class="modal" style="max-width:600px; display:flex; flex-direction:column;">
-    <h3>🤖 AI Օգնական</h3>
-    <div class="modal-sub">Կարող ես հարցնել՝ գտիր հայտարարություն (ներառյալ list.am-ից նոր որոնում), կամ հարցեր տալ պայմանագրի/օրենքի մասին։</div>
-    <div id="aiChatBox" style="flex:1; overflow-y:auto; max-height:340px; margin-bottom:12px; display:flex; flex-direction:column; gap:10px; padding:4px;"></div>
-    <div id="aiLoading" style="display:none; font-size:12.5px; color:var(--ink-soft); margin-bottom:8px;">AI-ն մտածում է...</div>
-    <div class="field" style="margin-bottom:8px;">
-      <textarea id="aiInput" placeholder="օր․ Գտիր 2 սենյականոց Աբովյան փողոցում, ուղղակի սեփականատիրոջից" style="min-height:60px;"></textarea>
-    </div>
-    <div class="modal-actions">
-      <button class="btn btn-ghost" id="aiCloseBtn">Փակել</button>
-      <button class="btn btn-primary" id="aiSendBtn">Ուղարկել</button>
-    </div>
-  </div>
 </div>
 
 <script>
@@ -920,79 +898,6 @@ async function autoSyncOnLoad(){
     await fetchPublicGist();
   }
 }
-
-// --- AI Assistant (uses Claude API with web_search, to search own listings + list.am) ---
-let aiMessages = [];
-
-function linkify(text){
-  const escaped = escapeHtml(text);
-  return escaped.replace(/(https?:\/\/[^\s]+)/g, url => `<a href="${url}" target="_blank" rel="noopener">${url}</a>`);
-}
-
-function renderAiChat(){
-  const box = $('aiChatBox');
-  box.innerHTML = aiMessages.map(m=>`<div class="ai-msg ${m.role}">${linkify(m.content)}</div>`).join('');
-  box.scrollTop = box.scrollHeight;
-}
-
-function ownListingsSummary(){
-  return listings.slice(0,80).map(l=>({
-    district:l.district, street:l.street, dealType:l.dealType, price:l.price,
-    rooms:l.rooms, area:l.area, floor:l.floor, commission:l.commission,
-    available:l.available, phone:l.phone, url:l.url
-  }));
-}
-
-$('openAiBtn').onclick = ()=>{ $('aiOverlay').classList.add('show'); renderAiChat(); };
-$('aiCloseBtn').onclick = ()=> $('aiOverlay').classList.remove('show');
-$('aiOverlay').onclick = (e)=>{ if(e.target.id==='aiOverlay') $('aiOverlay').classList.remove('show'); };
-
-$('aiSendBtn').onclick = async ()=>{
-  const text = $('aiInput').value.trim();
-  if(!text) return;
-  aiMessages.push({role:'user', content:text});
-  $('aiInput').value='';
-  renderAiChat();
-  $('aiLoading').style.display = 'block';
-
-  const systemPrompt = `Դու Yerevan Nest անշարժ գույքի գործակալության AI օգնականն ես, աշխատում ես հայերեն։ Երկու գործառույթ ունես.
-
-1) ՀԱՅՏԱՐԱՐՈՒԹՅՈՒՆՆԵՐԻ ՈՐՈՆՈՒՄ. Ստորև տրված է գործակալի սեփական հայտարարությունների ցանկը (JSON): առաջինը ստուգիր՝ արդյոք համապատասխան հայտարարություն կա այնտեղ։ Հետո, եթե պետք է, օգտագործիր web_search գործիքը list.am կայքում նմանատիպ նոր հայտարարություններ գտնելու համար (site:list.am որոնումներ)։ Երբ որոնում ես list.am-ում, ՈՒԺԵՂ ՆԱԽԱՊԱՏՎՈՒԹՅՈՒՆ տուր հայտարարություններին, որոնք ուղղակիորեն սեփականատիրոջից են (նշումներ՝ "անմիջապես սեփականատիրոջից", "առանց միջնորդի", "առանց միջնորդավճարի" հաճախ նշան է) և խուսափիր/նշիր կասկածով այն հայտարարությունները, որոնք կարծես գործակալությունից են (կրկնվող տեքստեր, "Կոդ" նշում, պրոֆեսիոնալ նկարագրություն)։ ՈՐԵՎԷ ԴԵՊՔՈՒՄ հստակ նշիր, եթե վստահ չես՝ սեփականատեր է թե գործակալություն, որ գործակալը ինքը ստուգի։ Յուրաքանչյուր գտածի համար տուր՝ հասցե/թաղամաս, գին, սենյակ, հարկ, և ուղիղ list.am հղումը։
-
-2) ԻՐԱՎԱԿԱՆ/ՊԱՅՄԱՆԱԳՐԻ ՀԱՐՑԵՐ. Կարող ես պատասխանել ընդհանուր հարցերի Հայաստանի վարձակալության/վաճառքի պայմանագրերի, պրակտիկայի մասին։ ՄԻՇՏ հստակ նշիր, որ սա ընդհանուր տեղեկատվություն է, ոչ թե իրավաբանական խորհրդատվություն, և բարդ դեպքերում խորհուրդ տուր դիմել իրական իրավաբանի։
-
-Պատասխանիր հակիրճ, գործնական, հայերենով։
-
-Գործակալի սեփական հայտարարությունները (JSON)՝
-${JSON.stringify(ownListingsSummary())}`;
-
-  try{
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-6",
-        max_tokens: 1000,
-        system: systemPrompt,
-        messages: aiMessages.map(m=>({role:m.role, content:m.content})),
-        tools: [{ type: "web_search_20250305", name: "web_search" }]
-      })
-    });
-    const data = await response.json();
-    const textBlocks = (data.content || []).filter(b=>b.type==='text').map(b=>b.text);
-    const reply = textBlocks.join('\n\n') || 'Չհաջողվեց պատասխան ստանալ։';
-    aiMessages.push({role:'assistant', content: reply});
-  }catch(e){
-    aiMessages.push({role:'assistant', content:'Սխալ տեղի ունեցավ AI-ի հետ կապվելիս։ Ստուգիր ինտերնետ կապը և փորձիր կրկին։'});
-  }
-  $('aiLoading').style.display = 'none';
-  renderAiChat();
-};
-
-$('aiInput').addEventListener('keydown', (e)=>{
-  if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); $('aiSendBtn').click(); }
-});
-
 loadListings();
 autoSyncOnLoad();
 applyEditorMode();
